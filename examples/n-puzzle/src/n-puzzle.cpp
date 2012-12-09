@@ -12,8 +12,8 @@
 #include <fstream>
 #include <cmath>
 #include <cstdlib>
-#include "AStarSolver.h"
 #include "Puzzle.h"
+#include "AStarSolver.h"
 
 using std::abs;
 using std::cerr;
@@ -90,27 +90,33 @@ int main (int argc, char **argv) {
         Puzzle to_solve(argv[1]);
         Puzzle solution(argv[2]);
 
-        AStarSolver<Puzzle> displaced_solver(to_solve, solution, displaced);
-        AStarSolver<Puzzle> manhattan_solver(to_solve, solution, manhattan);
-        AStarSolver<Puzzle> sumdisman_solver(to_solve, solution, sumdisman);
+        auto generator = [](const Puzzle& p) { return p.get_neighbors(); };
+        auto distance = [](const Puzzle&, const Puzzle&) { return 1; };
+
+        auto displaced_solver = make_solver(to_solve, solution, generator, distance, displaced);
+        auto manhattan_solver = make_solver(to_solve, solution, generator, distance, manhattan);
+        auto sumdisman_solver = make_solver(to_solve, solution, generator, distance, sumdisman);
 
         /*
          * Make it so!
          */
         displaced_solver.solve();
+        {
         ofstream displaced_out("displaced.txt");
         displaced_solver.print_solution(displaced_out);
-        displaced_out.close();
+        }
 
         manhattan_solver.solve();
+        {
         ofstream manhattan_out("manhattan.txt");
         manhattan_solver.print_solution(manhattan_out);
-        manhattan_out.close();
+        }
 
         sumdisman_solver.solve();
+        {
         ofstream sumdisman_out("displaced-manhattan.txt");
         sumdisman_solver.print_solution(sumdisman_out);
-        sumdisman_out.close();
+        }
     } catch (const char* str) {
         cerr << str << endl;
     }
