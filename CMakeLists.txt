@@ -6,7 +6,7 @@ set(libastar_VERSION_MINOR 1)
 
 set(INCLUDE_DIRS include)
 set(INCLUDE_INSTALL_DEST include/astar)
-set(GCC_CFLAGS -std=c++11 -Wall -Wextra)
+set(GCC_CFLAGS -std=c++11 -Wall -Wextra -Werror -pedantic)
 set(VS_CFLAGS /Wall)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
