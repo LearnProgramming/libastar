@@ -13,7 +13,7 @@
 #include <cmath>
 #include <cstdlib>
 #include "Puzzle.h"
-#include "AStarSolver.h"
+#include "astar/solver.h"
 
 using std::abs;
 using std::cerr;
