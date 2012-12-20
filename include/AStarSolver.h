@@ -42,31 +42,37 @@ class AStarSolver
                 Node(AStarSolver& s, const T& state, std::shared_ptr<Node> previous = nullptr);
         };
 
+        using SNode = std::shared_ptr<Node>;
+
+        template<class... Args>
+        SNode make_snode(Args&&... args) {
+            return std::make_shared<Node>(std::forward<Args>(args)...);
+        }
+
         struct ByCost {
             // using greater than creates a min-heap
-            bool operator()(const Node& l, const Node& r) {
-                return l.cost_ > r.cost_;
+            bool operator()(const SNode& l, const SNode& r) {
+                return l->cost_ > r->cost_;
             }
         };
 
         struct ByState {
-            bool operator()(const Node& l, const Node& r) {
-                return l.state_ < r.state_;
+            bool operator()(const SNode& l, const SNode& r) {
+                return l->state_ < r->state_;
             }
         };
-
 
         T goal_;
         Generator generator_func_;
         Distance distance_func_;
         Estimator cost_func_;
-        std::shared_ptr<Node> last_;
-        std::set<Node,ByState> closed_set;
-        std::priority_queue<Node,std::vector<Node>,ByCost> open_set;
+        SNode last_;
+        std::set<SNode,ByState> closed_set;
+        std::priority_queue<SNode,std::vector<SNode>,ByCost> open_set;
 };
 
 template<class T, class G, class H>
-AStarSolver<T,G,H>::Node::Node(AStarSolver& as, const T& s, std::shared_ptr<Node> p) :
+AStarSolver<T,G,H>::Node::Node(AStarSolver& as, const T& s, SNode p) :
     state_(s), prev_(p),
     distance_(p ? (p->distance_ + as.distance_func_(p->state_, s)) : G()),
     estimate_(as.cost_func_(s, as.goal_)),
@@ -78,7 +84,7 @@ template<class T, class G, class H>
 AStarSolver<T,G,H>::AStarSolver(const T& s, const T& g, const Generator& gen, const Distance& d, const Estimator& c) :
     goal_(g), generator_func_(gen), distance_func_(d), cost_func_(c)
 {
-    open_set.push(Node(*this,s));
+    open_set.push(make_snode(*this,s));
 }
 
 template<class T, class G, class H>
@@ -110,21 +116,21 @@ bool AStarSolver<T,G,H>::solve()
 {
     while (!open_set.empty()) {
         auto it_inserted = closed_set.insert(open_set.top());
-        auto sp = std::make_shared<Node>(*(it_inserted.first));
-
-        if (sp->state_ == goal_) {
-            last_ = sp;
-            return true;
-        }
-
         open_set.pop();
 
         // wasn't present in the set before
         if (it_inserted.second) {
-            for (auto& n : generator_func_(sp->state_)) {
-                auto node = Node(*this, n, sp);
-                if (closed_set.find(node) == end(closed_set)) {
-                    open_set.push(node);
+            auto snode = *it_inserted.first;
+
+            if (snode->state_ == goal_) {
+                last_ = snode;
+                return true;
+            }
+
+            for (auto& n : generator_func_(snode->state_)) {
+                auto new_node = make_snode(*this, n, snode);
+                if (closed_set.find(new_node) == end(closed_set)) {
+                    open_set.push(new_node);
                 }
             }
         }
@@ -133,8 +139,8 @@ bool AStarSolver<T,G,H>::solve()
     return false;
 }
 
-template<class T, class X, class Y, class Z>
-auto make_solver(const T& start, const T& goal, X generator, Y distance, Z estimator)
+template<class T, class F, class G, class H>
+auto make_solver(const T& start, const T& goal, F generator, G distance, H estimator)
     -> AStarSolver<T,decltype(distance(start, goal)), decltype(estimator(start, goal))> {
     return AStarSolver<T,decltype(distance(start, goal)), decltype(estimator(start, goal))>(start, goal, generator, distance, estimator);
 }
