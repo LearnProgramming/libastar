@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "heapset.h"
 
 /*
  * This class finds the best path from the starting state to the goal state
@@ -67,8 +68,8 @@ class AStarSolver
         Distance distance_func_;
         Estimator cost_func_;
         SNode last_;
-        std::set<SNode,ByState> closed_set;
-        std::priority_queue<SNode,std::vector<SNode>,ByCost> open_set;
+        std::set<SNode,ByState> closed_set_;
+        HeapSet<SNode,ByState,ByCost> open_set_;
 };
 
 template<class T, class G, class H>
@@ -84,7 +85,7 @@ template<class T, class G, class H>
 AStarSolver<T,G,H>::AStarSolver(const T& s, const T& g, const Generator& gen, const Distance& d, const Estimator& c) :
     goal_(g), generator_func_(gen), distance_func_(d), cost_func_(c)
 {
-    open_set.push(make_snode(*this,s));
+    open_set_.push(make_snode(*this,s));
 }
 
 template<class T, class G, class H>
@@ -114,24 +115,20 @@ void AStarSolver<T,G,H>::print_solution(std::ostream& o) const
 template<class T, class G, class H>
 bool AStarSolver<T,G,H>::solve()
 {
-    while (!open_set.empty()) {
-        auto it_inserted = closed_set.insert(open_set.top());
-        open_set.pop();
+    while (!open_set_.empty()) {
+        auto it_inserted = closed_set_.insert(open_set_.pop());
 
-        // wasn't present in the set before
-        if (it_inserted.second) {
-            auto snode = *it_inserted.first;
+        auto snode = *it_inserted.first;
 
-            if (snode->state_ == goal_) {
-                last_ = snode;
-                return true;
-            }
+        if (snode->state_ == goal_) {
+            last_ = snode;
+            return true;
+        }
 
-            for (auto& n : generator_func_(snode->state_)) {
-                auto new_node = make_snode(*this, n, snode);
-                if (closed_set.find(new_node) == end(closed_set)) {
-                    open_set.push(new_node);
-                }
+        for (auto& n : generator_func_(snode->state_)) {
+            auto new_node = make_snode(*this, n, snode);
+            if (closed_set_.find(new_node) == end(closed_set_)) {
+                open_set_.push(new_node);
             }
         }
     }
