@@ -4,8 +4,6 @@ project(libastar CXX)
 set(libastar_VERSION_MAJOR 0) 
 set(libastar_VERSION_MINOR 1) 
 
-set(INCLUDE_DIRS include)
-set(INCLUDE_INSTALL_DEST include/astar)
 set(GCC_CFLAGS -std=c++11 -Wall -Wextra -Werror -pedantic)
 set(CLANG_CFLAGS ${GCC_CFLAGS})
 set(VS_CFLAGS /Wall)
@@ -18,9 +16,11 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     set(CFLAGS ${VS_CFLAGS})
 endif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 
+set(INCLUDE_DIRS include)
 include_directories(${INCLUDE_DIRS})
 
-install(DIRECTORY ${INCLUDE_DIRS} DESTINATION ${INCLUDE_INSTALL_DEST})
+# default install is /usr/local/include
+install(DIRECTORY ${INCLUDE_DIRS} DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 # for Visual Studio folders
 file(GLOB INCLUDE_FILES "${INCLUDE_DIRS}/*.h")
