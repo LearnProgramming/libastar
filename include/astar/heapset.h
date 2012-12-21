@@ -17,8 +17,10 @@ class HeapSet {
     private:
         std::set<T,SC> states_;
         std::priority_queue<T,std::vector<T>,VC> heap_;
+        // returns true if second arg is higher priority than the first
         VC higher_priority_;
         T pop_heap();
+        void update_heap(const T& old, const T& updated);
 };
 
 template<class T, class SC, class VC>
@@ -46,20 +48,8 @@ void HeapSet<T,SC,VC>::push(const T& t) {
         heap_.push(t);
     } else {
         auto old = *it_inserted.first;
-        if (higher_priority_(t, old)) {
-            std::deque<T> queue;
-
-            do {
-                queue.push_back(pop_heap());
-            } while (queue.back() != old);
-
-            queue.back() = t;
-
-            while (!queue.empty()) {
-                heap_.push(queue.back());
-                queue.pop_back();
-            }
-
+        if (higher_priority_(old, t)) {
+            update_heap(old, t);
             auto it = states_.erase(it_inserted.first);
             states_.insert(it, t);
         }
@@ -74,20 +64,8 @@ void HeapSet<T,SC,VC>::push(T&& t) {
         heap_.push(std::forward<T>(t));
     } else {
         auto old = *it_inserted.first;
-        if (higher_priority_(t, old)) {
-            std::deque<T> queue;
-
-            do {
-                queue.push_back(pop_heap());
-            } while (queue.back() != old);
-
-            queue.back() = t;
-
-            while (!queue.empty()) {
-                heap_.push(queue.back());
-                queue.pop_back();
-            }
-
+        if (higher_priority_(old, t)) {
+            update_heap(old, t);
             auto it = states_.erase(it_inserted.first);
             states_.insert(it, std::forward<T>(t));
         }
@@ -99,4 +77,20 @@ T HeapSet<T,SC,VC>::pop_heap() {
     T t = heap_.top();
     heap_.pop();
     return std::move(t);
+}
+
+template<class T, class SC, class VC>
+void HeapSet<T,SC,VC>::update_heap(const T& old, const T& updated) {
+    std::deque<T> queue;
+
+    do {
+        queue.push_back(pop_heap());
+    } while (queue.back() != old);
+
+    queue.back() = updated;
+
+    while (!queue.empty()) {
+        heap_.push(queue.back());
+        queue.pop_back();
+    }
 }
