@@ -128,7 +128,7 @@ bool AStarSolver<T,G,H>::solve()
         for (auto& n : generator_func_(snode->state_)) {
             auto new_node = make_snode(*this, n, snode);
             if (closed_set_.find(new_node) == end(closed_set_)) {
-                open_set_.push(new_node);
+                open_set_.push(std::move(new_node));
             }
         }
     }
