@@ -16,10 +16,10 @@ using std::swap;
 using std::vector;
 
 ostream& operator<< (ostream& o, const Puzzle& p) {
-    for(TileIt it = p.tiles.begin(); it != p.tiles.end() - 1; it++) {
-        o << *it << " ";
+    for(size_t i = 0; i < p.tiles.size(); ++i) {
+        o << p.tiles[i] << (((i + 1) % p.width) ? ' ' : '\n');
     }
-    return o << *p.tiles.rbegin() << '\n';
+    return o;
 }
 
 bool operator==(const Puzzle&a, const Puzzle& b) { return a.tiles == b.tiles; }
