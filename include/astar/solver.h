@@ -68,8 +68,7 @@ class AStarSolver
         Distance distance_func_;
         Estimator cost_func_;
         SNode last_;
-        std::set<SNode,ByState> closed_set_;
-        HeapSet<SNode,ByState,ByCost> open_set_;
+        CachingHeapSet<SNode,ByState,ByCost,CloseOnPop::TRUE> states_;
 };
 
 template<class T, class G, class H>
@@ -85,7 +84,7 @@ template<class T, class G, class H>
 AStarSolver<T,G,H>::AStarSolver(const T& s, const T& g, const Generator& gen, const Distance& d, const Estimator& c) :
     goal_(g), generator_func_(gen), distance_func_(d), cost_func_(c)
 {
-    open_set_.push(make_snode(*this,s));
+    states_.push(make_snode(*this,s));
 }
 
 template<class T, class G, class H>
@@ -115,10 +114,8 @@ void AStarSolver<T,G,H>::print_solution(std::ostream& o) const
 template<class T, class G, class H>
 bool AStarSolver<T,G,H>::solve()
 {
-    while (!open_set_.empty()) {
-        auto it_inserted = closed_set_.insert(open_set_.pop());
-
-        auto snode = *it_inserted.first;
+    while (!states_.empty()) {
+        auto snode = states_.pop();
 
         if (snode->state_ == goal_) {
             last_ = snode;
@@ -126,10 +123,7 @@ bool AStarSolver<T,G,H>::solve()
         }
 
         for (auto& n : generator_func_(snode->state_)) {
-            auto new_node = make_snode(*this, n, snode);
-            if (closed_set_.find(new_node) == end(closed_set_)) {
-                open_set_.push(std::move(new_node));
-            }
+            states_.push(make_snode(*this, n, snode));
         }
     }
 
