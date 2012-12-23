@@ -5,86 +5,109 @@
 #include <set>
 #include <vector>
 
-template<class T, class SC = std::less<T>, class VC = std::less<T>>
-class HeapSet {
+enum class CloseOnPop : bool { FALSE, TRUE };
+
+template<class T>
+class Closeable {
+    public:
+        Closeable(const T& t, bool c = false) : t_(t), closed_(c) {}
+        operator T&() { return t_; }
+        operator const T&() const { return t_; }
+        bool operator!() const { return closed_; }
+    private:
+        T t_; bool closed_;
+};
+
+template<class T>
+class Wrapper {
+    public:
+        Wrapper(const T&, bool = false) {}
+        operator T&() { return t_; }
+        operator const T&() const { return t_; }
+        bool operator!() const { return false; }
+    private:
+        T t_;
+};
+
+template<class T, CloseOnPop COP> struct SetT {
+    using type = Wrapper<T>;
+};
+template<class T> struct SetT<T,CloseOnPop::TRUE> {
+    using type = Closeable<T>;
+};
+
+template<class T,
+    class SC = std::less<T>, class VC = std::less<T>,
+    CloseOnPop COP = CloseOnPop::FALSE>
+class CachingHeapSet {
     public:
         bool empty() const;
         const T& top() const;
         T pop();
         void push(const T& val);
-        void push(T&& val);
 
     private:
-        std::set<T,SC> states_;
+        using SetType = typename SetT<T,COP>::type;
+
+        std::set<SetType,SC> states_;
         std::priority_queue<T,std::vector<T>,VC> heap_;
         // returns true if second arg is higher priority than the first
         VC higher_priority_;
-        T pop_heap();
+        T pop_heap(CloseOnPop);
         void update_heap(const T& old, const T& updated);
 };
 
-template<class T, class SC, class VC>
-bool HeapSet<T,SC,VC>::empty() const {
+template<class T, class SC, class VC, CloseOnPop COP>
+bool CachingHeapSet<T,SC,VC,COP>::empty() const {
     return states_.empty();
 }
 
-template<class T, class SC, class VC>
-const T& HeapSet<T,SC,VC>::top() const {
+template<class T, class SC, class VC, CloseOnPop COP>
+const T& CachingHeapSet<T,SC,VC,COP>::top() const {
     return heap_.top();
 }
 
-template<class T, class SC, class VC>
-T HeapSet<T,SC,VC>::pop() {
-    T t = pop_heap();
-    states_.erase(t);
-    return std::move(t);
+template<class T, class SC, class VC, CloseOnPop COP>
+T CachingHeapSet<T,SC,VC,COP>::pop() {
+    return pop_heap(COP);
 }
 
-template<class T, class SC, class VC>
-void HeapSet<T,SC,VC>::push(const T& t) {
-    auto it_inserted = states_.insert(t);
+template<class T, class SC, class VC, CloseOnPop COP>
+void CachingHeapSet<T,SC,VC,COP>::push(const T& t) {
+    auto it_inserted = states_.insert(SetType{t});
+    bool inserted = it_inserted.second;
+    auto& tt = *it_inserted.first;
 
-    if (it_inserted.second) {
-        heap_.push(t);
+    if (inserted) {
+        heap_.push(tt);
     } else {
-        auto old = *it_inserted.first;
-        if (higher_priority_(old, t)) {
-            update_heap(old, t);
+        if (!tt && higher_priority_(tt, t)) {
+            update_heap(tt, t);
             auto it = states_.erase(it_inserted.first);
             states_.insert(it, t);
         }
     }
 }
 
-template<class T, class SC, class VC>
-void HeapSet<T,SC,VC>::push(T&& t) {
-    auto it_inserted = states_.insert(t);
-
-    if (it_inserted.second) {
-        heap_.push(std::forward<T>(t));
-    } else {
-        auto old = *it_inserted.first;
-        if (higher_priority_(old, t)) {
-            update_heap(old, t);
-            auto it = states_.erase(it_inserted.first);
-            states_.insert(it, std::forward<T>(t));
-        }
-    }
-}
-
-template<class T, class SC, class VC>
-T HeapSet<T,SC,VC>::pop_heap() {
+template<class T, class SC, class VC, CloseOnPop COP>
+T CachingHeapSet<T,SC,VC,COP>::pop_heap(CloseOnPop cop) {
     T t = heap_.top();
+    if (COP == CloseOnPop::TRUE && cop == CloseOnPop::TRUE) {
+        SetType val{t, true};
+        auto it = states_.find(val);
+        it = states_.erase(it);
+        states_.insert(it, val);
+    }
     heap_.pop();
     return std::move(t);
 }
 
-template<class T, class SC, class VC>
-void HeapSet<T,SC,VC>::update_heap(const T& old, const T& updated) {
+template<class T, class SC, class VC, CloseOnPop COP>
+void CachingHeapSet<T,SC,VC,COP>::update_heap(const T& old, const T& updated) {
     std::deque<T> queue;
 
     do {
-        queue.push_back(pop_heap());
+        queue.push_back(pop_heap(CloseOnPop::FALSE));
     } while (queue.back() != old);
 
     queue.back() = updated;
