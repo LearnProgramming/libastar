@@ -32,18 +32,19 @@ class AStarSolver
         bool solve();
 
     private:
+        struct Node;
+        using SNode = std::shared_ptr<Node>;
+
         struct Node
         {
+                SNode prev_;
                 T state_;
                 G distance_;
                 H estimate_;
                 decltype(distance_ + estimate_) cost_;
-                std::shared_ptr<Node> prev_;
 
-                Node(AStarSolver& s, const T& state, std::shared_ptr<Node> previous = nullptr);
+                Node(AStarSolver& s, const T& state, SNode previous = nullptr);
         };
-
-        using SNode = std::shared_ptr<Node>;
 
         template<class... Args>
         SNode make_snode(Args&&... args) {
@@ -73,7 +74,7 @@ class AStarSolver
 
 template<class T, class G, class H>
 AStarSolver<T,G,H>::Node::Node(AStarSolver& as, const T& s, SNode p) :
-    state_(s), prev_(p),
+    prev_(p), state_(s),
     distance_(p ? (p->distance_ + as.distance_func_(p->state_, s)) : G()),
     estimate_(as.cost_func_(s, as.goal_)),
     cost_(distance_ + estimate_)
