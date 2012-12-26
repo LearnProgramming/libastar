@@ -9,5 +9,4 @@ add_executable(${TARGET_NAME} ${SOURCES})
 
 set_target_properties(${TARGET_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${DEST_DIR}
-    COMPILE_FLAGS ${CFLAGS}
     )
