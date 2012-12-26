@@ -100,7 +100,6 @@ void AStarSolver<T,G,H>::print_solution(std::ostream& o) const
             o << "Step: " << ++step << '\n';
             o << "Estimator: " << p->cost_ << '\n';
             o << "State:\n" << p->state_ << '\n';
-            o << '\n';
             p = p->prev_;
         }
 
