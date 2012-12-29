@@ -1,113 +1,119 @@
 #pragma once
 
 #include <deque>
+#include <map>
+#include <memory>
 #include <queue>
-#include <set>
 #include <vector>
 
-enum class CloseOnPop : bool { FALSE, TRUE };
-
-template<class T>
-class Closeable {
-    public:
-        Closeable(const T& t, bool c = false) : t_(t), closed_(c) {}
-        operator T&() { return t_; }
-        operator const T&() const { return t_; }
-        bool operator!() const { return closed_; }
-    private:
-        T t_; bool closed_;
-};
-
-template<class T>
-class Wrapper {
-    public:
-        Wrapper(const T&, bool = false) {}
-        operator T&() { return t_; }
-        operator const T&() const { return t_; }
-        bool operator!() const { return false; }
-    private:
-        T t_;
-};
-
-template<class T, CloseOnPop COP> struct SetT {
-    using type = Wrapper<T>;
-};
-template<class T> struct SetT<T,CloseOnPop::TRUE> {
-    using type = Closeable<T>;
-};
-
-template<class T,
-    class SC = std::less<T>, class VC = std::less<T>,
-    CloseOnPop COP = CloseOnPop::FALSE>
-class CachingHeapSet {
+template<class T, class SC = std::less<T>, class VC = std::less<T>>
+class HeapSet {
     public:
         bool empty() const;
-        const T& top() const;
-        T pop();
-        void push(const T& val);
+        T* pop();
+        void push(T&& val);
+
+        template<typename... Args>
+        void emplace(Args&&... args);
 
     private:
-        using SetType = typename SetT<T,COP>::type;
+        using UT = std::unique_ptr<T>;
 
-        std::set<SetType,SC> states_;
-        std::priority_queue<T,std::vector<T>,VC> heap_;
+        template<typename U, typename... Args>
+        std::unique_ptr<U> make_unique(Args&&... args)
+        {
+            return std::unique_ptr<U>(new U(std::forward<Args>(args)...));
+        }
+
+        template<class... Args>
+        UT make_utype(Args&&... args) {
+            return make_unique<T>(std::forward<Args>(args)...);
+        }
+
+        struct USC {
+            bool operator()(const UT& l, const UT& r) {
+                return l && r && state_compare_(*l, *r);
+            }
+            SC state_compare_;
+        };
+
+        struct PVC {
+            bool operator()(const T* l, const T* r) {
+                return l && r && value_compare_(*l, *r);
+            }
+            VC value_compare_;
+        };
+
+        std::map<UT,bool,USC> states_;
+
+        using heap_type = T*;
+        std::priority_queue<heap_type,std::vector<heap_type>,PVC> heap_;
+
         // returns true if second arg is higher priority than the first
-        VC higher_priority_;
-        T pop_heap(CloseOnPop);
-        void update_heap(const T& old, const T& updated);
+        PVC higher_priority_;
+        heap_type pop_heap(bool close = true);
+        void update_heap(const heap_type& old, const heap_type& updated);
+        void insert(UT ut);
 };
 
-template<class T, class SC, class VC, CloseOnPop COP>
-bool CachingHeapSet<T,SC,VC,COP>::empty() const {
+template<class T, class SC, class VC>
+bool HeapSet<T,SC,VC>::empty() const {
     return states_.empty();
 }
 
-template<class T, class SC, class VC, CloseOnPop COP>
-const T& CachingHeapSet<T,SC,VC,COP>::top() const {
-    return heap_.top();
+template<class T, class SC, class VC>
+auto HeapSet<T,SC,VC>::pop() -> heap_type {
+    return pop_heap();
 }
 
-template<class T, class SC, class VC, CloseOnPop COP>
-T CachingHeapSet<T,SC,VC,COP>::pop() {
-    return pop_heap(COP);
+template<class T, class SC, class VC>
+void HeapSet<T,SC,VC>::push(T&& t) {
+    insert(make_utype(std::move(t)));
 }
 
-template<class T, class SC, class VC, CloseOnPop COP>
-void CachingHeapSet<T,SC,VC,COP>::push(const T& t) {
-    auto it_inserted = states_.insert(SetType{t});
-    bool inserted = it_inserted.second;
-    auto& tt = *it_inserted.first;
+template<class T, class SC, class VC> template<typename... Args>
+void HeapSet<T,SC,VC>::emplace(Args&&... args) {
+    insert(make_utype(std::forward<Args>(args)...));
+}
 
-    if (inserted) {
-        heap_.push(tt);
+template<class T, class SC, class VC>
+void HeapSet<T,SC,VC>::insert(UT ut) {
+    auto it = states_.find(ut);
+
+    // TODO: emplace(_hint) vs insert
+    if (it == end(states_)) {
+        heap_.push(ut.get());
+        states_.insert(std::make_pair(std::move(ut), false));
     } else {
-        if (!tt && higher_priority_(tt, t)) {
-            update_heap(tt, t);
-            auto it = states_.erase(it_inserted.first);
-            states_.insert(it, t);
+        auto old = it->first.get();
+        auto updated = ut.get();
+
+        if (!it->second && higher_priority_(old, updated)) {
+            update_heap(old, updated);
+            it = states_.erase(it);
+            states_.insert(it, std::make_pair(std::move(ut), false));
         }
     }
 }
 
-template<class T, class SC, class VC, CloseOnPop COP>
-T CachingHeapSet<T,SC,VC,COP>::pop_heap(CloseOnPop cop) {
-    T t = heap_.top();
-    if (COP == CloseOnPop::TRUE && cop == CloseOnPop::TRUE) {
-        SetType val{t, true};
-        auto it = states_.find(val);
-        it = states_.erase(it);
-        states_.insert(it, val);
+template<class T, class SC, class VC>
+auto HeapSet<T,SC,VC>::pop_heap(bool close) -> heap_type {
+    auto t = heap_.top();
+    auto ut = UT(t);
+    if (close) {
+        states_.find(ut)->second = true;
     }
+    ut.release();
     heap_.pop();
-    return std::move(t);
+    return t;
 }
 
-template<class T, class SC, class VC, CloseOnPop COP>
-void CachingHeapSet<T,SC,VC,COP>::update_heap(const T& old, const T& updated) {
-    std::deque<T> queue;
+template<class T, class SC, class VC>
+void HeapSet<T,SC,VC>::update_heap(const heap_type& old, const heap_type& updated) {
+    std::deque<heap_type> queue;
 
     do {
-        queue.push_back(pop_heap(CloseOnPop::FALSE));
+        queue.push_back(pop_heap(false));
     } while (queue.back() != old);
 
     queue.back() = updated;
