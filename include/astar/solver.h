@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <iostream>
-#include <memory>
 #include <queue>
 #include <set>
 #include <utility>
@@ -23,7 +22,7 @@ class AStarSolver
         using Distance = std::function<G(const T& from, const T& to)>;
         using Estimator = std::function<H(const T& from, const T& to)>;
 
-        AStarSolver(const T& to_solve, const T& goal_state, const Generator& g, const Distance& d, const Estimator& e);
+        AStarSolver(T to_solve, T goal_state, Generator g, Distance d, Estimator e);
 
         void print_solution(std::ostream& out = std::cout) const;
         /*
@@ -32,35 +31,28 @@ class AStarSolver
         bool solve();
 
     private:
-        struct Node;
-        using SNode = std::shared_ptr<Node>;
-
         struct Node
         {
-                SNode prev_;
+                Node* prev_;
                 T state_;
                 G distance_;
                 H estimate_;
                 decltype(distance_ + estimate_) cost_;
 
-                Node(AStarSolver& s, const T& state, SNode previous = nullptr);
+                Node(const AStarSolver& s, T&& state, Node* previous = nullptr);
         };
 
-        template<class... Args>
-        SNode make_snode(Args&&... args) {
-            return std::make_shared<Node>(std::forward<Args>(args)...);
-        }
 
         struct ByCost {
             // using greater than creates a min-heap
-            bool operator()(const SNode& l, const SNode& r) {
-                return l->cost_ > r->cost_;
+            bool operator()(const Node& l, const Node& r) {
+                return l.cost_ > r.cost_;
             }
         };
 
         struct ByState {
-            bool operator()(const SNode& l, const SNode& r) {
-                return l->state_ < r->state_;
+            bool operator()(const Node& l, const Node& r) {
+                return l.state_ < r.state_;
             }
         };
 
@@ -68,24 +60,24 @@ class AStarSolver
         Generator generator_func_;
         Distance distance_func_;
         Estimator cost_func_;
-        SNode last_;
-        CachingHeapSet<SNode,ByState,ByCost,CloseOnPop::TRUE> states_;
+        Node* last_;
+        HeapSet<Node,ByState,ByCost> states_;
 };
 
 template<class T, class G, class H>
-AStarSolver<T,G,H>::Node::Node(AStarSolver& as, const T& s, SNode p) :
-    prev_(p), state_(s),
-    distance_(p ? (p->distance_ + as.distance_func_(p->state_, s)) : G()),
-    estimate_(as.cost_func_(s, as.goal_)),
+AStarSolver<T,G,H>::Node::Node(const AStarSolver& as, T&& s, Node* p) :
+    prev_(p), state_(std::forward<T>(s)),
+    distance_(p ? (p->distance_ + as.distance_func_(p->state_, state_)) : G()),
+    estimate_(as.cost_func_(state_, as.goal_)),
     cost_(distance_ + estimate_)
 {
 }
 
 template<class T, class G, class H>
-AStarSolver<T,G,H>::AStarSolver(const T& s, const T& g, const Generator& gen, const Distance& d, const Estimator& c) :
-    goal_(g), generator_func_(gen), distance_func_(d), cost_func_(c)
+AStarSolver<T,G,H>::AStarSolver(T s, T g, Generator gen, Distance d, Estimator e) :
+    goal_(std::move(g)), generator_func_(std::move(gen)), distance_func_(std::move(d)), cost_func_(std::move(e))
 {
-    states_.push(make_snode(*this,s));
+    states_.emplace(*this,std::move(s));
 }
 
 template<class T, class G, class H>
@@ -115,15 +107,15 @@ template<class T, class G, class H>
 bool AStarSolver<T,G,H>::solve()
 {
     while (!states_.empty()) {
-        auto snode = states_.pop();
+        auto pnode = states_.pop();
 
-        if (snode->state_ == goal_) {
-            last_ = snode;
+        if (pnode->state_ == goal_) {
+            last_ = pnode;
             return true;
         }
 
-        for (auto& n : generator_func_(snode->state_)) {
-            states_.push(make_snode(*this, n, snode));
+        for (auto&& n : generator_func_(pnode->state_)) {
+            states_.emplace(*this, std::forward<T>(n), pnode);
         }
     }
 
@@ -131,7 +123,7 @@ bool AStarSolver<T,G,H>::solve()
 }
 
 template<class T, class F, class G, class H>
-auto make_solver(const T& start, const T& goal, F generator, G distance, H estimator)
-    -> AStarSolver<T,decltype(distance(start, goal)), decltype(estimator(start, goal))> {
-    return AStarSolver<T,decltype(distance(start, goal)), decltype(estimator(start, goal))>(start, goal, generator, distance, estimator);
+auto make_solver(T&& start, T&& goal, F generator, G distance, H estimator)
+    -> AStarSolver<typename std::remove_reference<T>::type,decltype(distance(start, goal)), decltype(estimator(start, goal))> {
+    return AStarSolver<typename std::remove_reference<T>::type,decltype(distance(start, goal)), decltype(estimator(start, goal))>(std::forward<T>(start), std::forward<T>(goal), generator, distance, estimator);
 }
