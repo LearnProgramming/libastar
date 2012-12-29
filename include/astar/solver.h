@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <queue>
 #include <set>
 #include <utility>
@@ -18,7 +19,7 @@ template<class T, class G, class H>
 class AStarSolver
 {
     public:
-        using Generator = std::function<std::vector<T>(const T&)>;
+        using Generator = std::function<void(std::vector<T>&, const T&)>;
         using Distance = std::function<G(const T& from, const T& to)>;
         using Estimator = std::function<H(const T& from, const T& to)>;
 
@@ -106,6 +107,8 @@ void AStarSolver<T,G,H>::print_solution(std::ostream& o) const
 template<class T, class G, class H>
 bool AStarSolver<T,G,H>::solve()
 {
+    std::vector<T> neighbors;
+
     while (!states_.empty()) {
         auto pnode = states_.pop();
 
@@ -114,16 +117,27 @@ bool AStarSolver<T,G,H>::solve()
             return true;
         }
 
-        for (auto&& n : generator_func_(pnode->state_)) {
-            states_.emplace(*this, std::forward<T>(n), pnode);
+        generator_func_(neighbors, pnode->state_);
+
+        for (auto&& n : neighbors) {
+            states_.emplace(*this, std::move(n), pnode);
         }
+
+        neighbors.clear();
     }
 
     return false;
 }
 
 template<class T, class F, class G, class H>
-auto make_solver(T&& start, T&& goal, F generator, G distance, H estimator)
+auto make_solver(T&& start, T&& goal, F&& generator, G&& distance, H&& estimator)
     -> AStarSolver<typename std::remove_reference<T>::type,decltype(distance(start, goal)), decltype(estimator(start, goal))> {
-    return AStarSolver<typename std::remove_reference<T>::type,decltype(distance(start, goal)), decltype(estimator(start, goal))>(std::forward<T>(start), std::forward<T>(goal), generator, distance, estimator);
+    return AStarSolver<typename std::remove_reference<T>::type,
+           decltype(distance(start, goal)),
+           decltype(estimator(start, goal))>
+               (std::forward<T>(start),
+                std::forward<T>(goal),
+                std::forward<F>(generator),
+                std::forward<G>(distance),
+                std::forward<H>(estimator));
 }

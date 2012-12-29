@@ -1,16 +1,20 @@
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <string>
 #include <sstream>
+#include <utility>
 #include <vector>
 #include "Puzzle.h"
 #include "Tile.h"
 
+using std::array;
 using std::ifstream;
 using std::istringstream;
 using std::ostream;
+using std::pair;
 using std::string;
 using std::swap;
 using std::vector;
@@ -85,48 +89,37 @@ Puzzle::Puzzle(const string& filename) {
     }
 }
 
+Puzzle::Puzzle(Puzzle p, size_t r, size_t c) :
+    tiles(std::move(p.tiles)), width(p.width), open_pos(r*width+c) {
+        swap(tiles[open_pos], tiles[p.open_pos]);
+}
+
 size_t Puzzle::get_width() const { return width; }
 
-vector<Puzzle> Puzzle::get_neighbors() const {
-    vector<Puzzle> puzzles;
-
+void Puzzle::get_neighbors(vector<Puzzle>& puzzles) const {
     size_t r0 = open_pos / width, c0 = open_pos % width;
     size_t row = r0 - 1, col = c0;
 
     if(row < r0) {
-        add_puzzle(puzzles, row, col);
+        puzzles.emplace_back(*this, row, col);
     }
 
     row = r0 + 1;
     if(row < width) {
-        add_puzzle(puzzles, row, col);
+        puzzles.emplace_back(*this, row, col);
     }
 
     row = r0;
     col = c0 - 1;
 
     if(col < c0) {
-        add_puzzle(puzzles, row, col);
+        puzzles.emplace_back(*this, row, col);
     }
 
     col = c0 + 1;
     if(col < width) {
-        add_puzzle(puzzles, row, col);
+        puzzles.emplace_back(*this, row, col);
     }
-
-    return puzzles;
-}
-
-void Puzzle::add_puzzle(vector<Puzzle>& puzzles, size_t row, size_t col) const {
-        Puzzle p(*this);
-        p.move_tile(row, col);
-        puzzles.push_back(p);
-}
-
-void Puzzle::move_tile(size_t row, size_t col) {
-    size_t new_open_pos = row * width + col;
-    swap(tiles[open_pos], tiles[new_open_pos]);
-    open_pos = new_open_pos;
 }
 
 /**
