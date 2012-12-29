@@ -90,7 +90,7 @@ int main (int argc, char **argv) {
         Puzzle to_solve(argv[1]);
         Puzzle solution(argv[2]);
 
-        auto generator = [](const Puzzle& p) { return p.get_neighbors(); };
+        auto generator = [](std::vector<Puzzle>& v, const Puzzle& p) { return p.get_neighbors(v); };
         auto distance = [](const Puzzle&, const Puzzle&) { return 1; };
 
         auto displaced_solver = make_solver(to_solve, solution, generator, distance, displaced);
