@@ -14,6 +14,7 @@ typedef std::vector<Tile>::const_iterator TileIt;
 class Puzzle {
     public:
         Puzzle(const std::string& filename);
+        Puzzle(Puzzle p, size_t r, size_t c);
 
         /*
          * Compares the current state to the desired solution state
@@ -22,16 +23,14 @@ class Puzzle {
          */
         bool might_reach(const Puzzle& solution) const;
         size_t get_width() const;
-        std::vector<Puzzle> get_neighbors() const;
+        void get_neighbors(std::vector<Puzzle>&) const;
 
     private:
         std::vector<Tile> tiles;
-        size_t open_pos;
         size_t width;
+        size_t open_pos;
 
         size_t count_inversions() const;
-        void add_puzzle(std::vector<Puzzle>& puzzles, size_t row, size_t col) const;
-        void move_tile(size_t row, size_t col);
 
         friend std::ostream& operator<< (std::ostream& o, const Puzzle& p);
         friend bool operator==(const Puzzle&, const Puzzle&);
